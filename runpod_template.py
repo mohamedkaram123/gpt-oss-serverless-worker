@@ -1,4 +1,7 @@
-"""GPT-OSS 120B RunPod Serverless Handler - Direct Model Loading"""
+"""
+GPT-OSS Direct Inference RunPod Template
+Copy this code to RunPod Custom Handler
+"""
 
 import runpod
 import logging
@@ -112,7 +115,7 @@ def generate_response(messages: List[Dict], max_tokens: int = None, temperature:
         return f"عذراً، حدث خطأ في توليد الرد: {str(e)}"
 
 def handler(job):
-    """RunPod serverless handler - Direct model execution"""
+    """RunPod serverless handler"""
     start_time = time.time()
     
     try:
@@ -144,8 +147,8 @@ def handler(job):
         temperature = job_input.get("temperature", TEMPERATURE)
         model_name = job_input.get("model", "gpt-oss-direct")
         
-        # Generate response using direct model
-        logger.info("🤖 Generating response with direct model...")
+        # Generate response
+        logger.info("🤖 Generating response...")
         generated_content = generate_response(messages, max_tokens, temperature)
         
         processing_time = time.time() - start_time
@@ -189,11 +192,10 @@ def handler(job):
             "model_loaded": model_loaded
         }
 
-# Initialize model on startup
+# Initialize
 logger.info("🚀 Starting GPT-OSS Direct RunPod Serverless Worker")
 logger.info("📋 Pre-loading model...")
 load_model()
 
 # Start RunPod worker
-if __name__ == "__main__":
-    runpod.serverless.start({"handler": handler})
+runpod.serverless.start({"handler": handler})
