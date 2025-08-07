@@ -14,8 +14,11 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 MODEL_NAME = os.getenv("MODEL_NAME", "microsoft/DialoGPT-large")  # Fallback for testing
-MAX_TOKENS = int(os.getenv("MAX_TOKENS", "2048"))
-TEMPERATURE = float(os.getenv("TEMPERATURE", "0.7"))
+MAX_TOKENS = int(os.getenv("MAX_TOKENS", "4096"))  # Increased for longer responses
+MIN_TOKENS = int(os.getenv("MIN_TOKENS", "50"))   # Minimum response length
+TEMPERATURE = float(os.getenv("TEMPERATURE", "0.8"))  # Slightly higher for more creativity
+TOP_P = float(os.getenv("TOP_P", "0.9"))  # Nucleus sampling
+REPETITION_PENALTY = float(os.getenv("REPETITION_PENALTY", "1.1"))  # Reduce repetition
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Global model and tokenizer
@@ -61,7 +64,7 @@ def load_model():
             if tokenizer.pad_token is None:
                 tokenizer.pad_token = tokenizer.eos_token
 
-def generate_response(messages: List[Dict], max_tokens: int = None, temperature: float = None):
+def generate_response(messages: List[Dict], max_tokens: int = None, temperature: float = None, min_tokens: int = None, top_p: float = None, repetition_penalty: float = None):
     """Generate response using the loaded model"""
     global model, tokenizer
     
@@ -93,10 +96,15 @@ def generate_response(messages: List[Dict], max_tokens: int = None, temperature:
             outputs = model.generate(
                 inputs,
                 max_new_tokens=max_tokens or MAX_TOKENS,
+                min_length=len(inputs[0]) + (min_tokens or MIN_TOKENS),  # Ensure minimum response length
                 temperature=temperature or TEMPERATURE,
+                top_p=top_p or TOP_P,
+                repetition_penalty=repetition_penalty or REPETITION_PENALTY,
                 do_sample=True,
                 pad_token_id=tokenizer.eos_token_id,
-                attention_mask=torch.ones_like(inputs)
+                attention_mask=torch.ones_like(inputs),
+                no_repeat_ngram_size=3,  # Prevent repetitive 3-grams
+                early_stopping=False  # Don't stop early
             )
         
         # Decode response
@@ -153,11 +161,14 @@ def handler(job):
         # Extract parameters
         max_tokens = job_input.get("max_tokens", MAX_TOKENS)
         temperature = job_input.get("temperature", TEMPERATURE)
+        min_tokens = job_input.get("min_tokens", MIN_TOKENS)
+        top_p = job_input.get("top_p", TOP_P)
+        repetition_penalty = job_input.get("repetition_penalty", REPETITION_PENALTY)
         model_name = job_input.get("model", "gpt-oss-120b")
         
         # Generate response using direct model
         logger.info("Generating response with direct model...")
-        generated_content = generate_response(messages, max_tokens, temperature)
+        generated_content = generate_response(messages, max_tokens, temperature, min_tokens, top_p, repetition_penalty)
         
         # Return OpenAI-compatible response
         return {
