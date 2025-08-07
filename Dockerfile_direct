@@ -1,0 +1,33 @@
+FROM runpod/base:0.6.3-cuda11.8.0
+
+# Set python3.11 as the default python
+RUN ln -sf $(which python3.11) /usr/local/bin/python && \
+    ln -sf $(which python3.11) /usr/local/bin/python3
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    wget \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements_direct.txt /requirements.txt
+RUN uv pip install --upgrade -r /requirements.txt --no-cache-dir --system
+
+# Create model cache directory
+RUN mkdir -p /root/.cache/huggingface
+
+# Add files
+ADD handler_direct.py /handler.py
+ADD test_input.json .
+
+# Set environment variables
+ENV TRANSFORMERS_CACHE=/root/.cache/huggingface
+ENV HF_HOME=/root/.cache/huggingface
+ENV MODEL_NAME=microsoft/DialoGPT-large
+ENV MAX_TOKENS=2048
+ENV TEMPERATURE=0.7
+
+# Run the handler
+CMD python -u /handler.py

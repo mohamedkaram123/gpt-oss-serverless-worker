@@ -117,8 +117,16 @@ def handler(job):
         
         # Check if GPT-OSS API is configured
         if not GPT_OSS_API_URL or GPT_OSS_API_URL == "http://localhost:8000":
-            # Return mock response for testing
-            logger.warning("GPT-OSS API not configured, returning mock response")
+            # Return enhanced mock response for testing
+            user_message = messages[-1].get('content', '') if messages else ''
+            logger.warning(f"GPT-OSS API not configured (URL: {GPT_OSS_API_URL}), returning mock response")
+            
+            # Generate more realistic mock response based on user input
+            if 'اختبار' in user_message or 'test' in user_message.lower():
+                mock_content = f"مرحباً! تم استلام رسالتك '{user_message}' بنجاح. هذا اختبار لـ GPT-OSS 120B على RunPod Serverless. النظام يعمل بشكل ممتاز! 🚀\n\nلربط API حقيقي، أضف GPT_OSS_API_URL في متغيرات البيئة."
+            else:
+                mock_content = f"أهلاً وسهلاً! استلمت رسالتك: '{user_message}'. أنا GPT-OSS 120B وأعمل على RunPod Serverless. حالياً في وضع الاختبار - لاستخدام النموذج الحقيقي، يرجى تكوين GPT_OSS_API_URL."
+            
             return {
                 "id": "chatcmpl-mock-123",
                 "object": "chat.completion",
@@ -129,17 +137,19 @@ def handler(job):
                         "index": 0,
                         "message": {
                             "role": "assistant",
-                            "content": f"Mock response: I received your message '{messages[-1].get('content', '')}'. This is a test response from GPT-OSS 120B serverless worker!"
+                            "content": mock_content
                         },
                         "finish_reason": "stop"
                     }
                 ],
                 "usage": {
-                    "prompt_tokens": 20,
-                    "completion_tokens": 30,
-                    "total_tokens": 50
+                    "prompt_tokens": len(user_message.split()) + 10,
+                    "completion_tokens": len(mock_content.split()),
+                    "total_tokens": len(user_message.split()) + len(mock_content.split()) + 10
                 },
-                "status": "success"
+                "status": "success",
+                "mock_mode": True,
+                "api_url_configured": GPT_OSS_API_URL
             }
         
         # Process the request asynchronously
