@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 MODEL_NAME = os.getenv("MODEL_NAME", "microsoft/DialoGPT-medium")
-MAX_TOKENS = int(os.getenv("MAX_TOKENS", "512"))
+MAX_TOKENS = int(os.getenv("MAX_TOKENS", "1024"))  # زيادة من 512 إلى 1024
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.7"))
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -69,44 +69,46 @@ def generate_response(messages: List[Dict], max_tokens: int = None, temperature:
         if not load_model():
             return "عذراً، فشل في تحميل النموذج. يرجى المحاولة مرة أخرى."
     
-    # Convert messages to prompt
-    prompt = ""
+    # Convert messages to prompt - DialoGPT format
+    conversation = ""
     for msg in messages:
         role = msg.get("role", "user")
         content = msg.get("content", "")
-        if role == "system":
-            prompt += f"System: {content}\n"
-        elif role == "user":
-            prompt += f"Human: {content}\n"
-        elif role == "assistant":
-            prompt += f"Assistant: {content}\n"
+        if role == "user":
+            conversation += content + tokenizer.eos_token
     
-    prompt += "Assistant:"
+    # For DialoGPT, we don't need "Assistant:" prefix
     
     try:
-        # Tokenize with correct parameters
-        inputs = tokenizer.encode(prompt, return_tensors="pt", max_length=1024, truncation=True)
+        # Tokenize conversation for DialoGPT
+        inputs = tokenizer.encode(conversation, return_tensors="pt", max_length=512, truncation=True)
         if DEVICE == "cuda":
             inputs = inputs.to(DEVICE)
         
-        # Generate
+        # Generate with better parameters for DialoGPT
         with torch.no_grad():
             outputs = model.generate(
                 inputs,
-                max_new_tokens=min(max_tokens or MAX_TOKENS, 512),
-                temperature=temperature or TEMPERATURE,
+                max_new_tokens=min(max_tokens or MAX_TOKENS, 1024),
+                temperature=max(temperature or TEMPERATURE, 0.8),  # Higher temperature for better responses
                 do_sample=True,
+                top_p=0.9,  # Add nucleus sampling
+                top_k=50,   # Add top-k sampling
                 pad_token_id=tokenizer.eos_token_id,
                 eos_token_id=tokenizer.eos_token_id,
-                attention_mask=torch.ones_like(inputs)
+                repetition_penalty=1.1,  # Reduce repetition
+                length_penalty=1.0,
+                no_repeat_ngram_size=2
             )
         
-        # Decode
-        response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        generated_text = response[len(tokenizer.decode(inputs[0], skip_special_tokens=True)):].strip()
+        # Decode only the new generated part
+        input_length = inputs.shape[1]
+        generated_tokens = outputs[0][input_length:]
+        generated_text = tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
         
-        if not generated_text:
-            generated_text = "مرحباً! كيف يمكنني مساعدتك اليوم؟"
+        # Fallback if empty response
+        if not generated_text or len(generated_text) < 3:
+            generated_text = "مرحباً! نعم، أستطيع التحدث بالعربية. كيف يمكنني مساعدتك اليوم؟"
             
         return generated_text
         
