@@ -1,8 +1,11 @@
 """GPT-OSS 120B RunPod Serverless Handler - Direct Model Loading"""
 
+import os
+# Fix hf_transfer issue
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
+
 import runpod
 import logging
-import os
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from typing import Dict, Any, List
@@ -81,8 +84,8 @@ def generate_response(messages: List[Dict], max_tokens: int = None, temperature:
     prompt += "Assistant:"
     
     try:
-        # Tokenize
-        inputs = tokenizer.encode(prompt, return_tensors="pt", truncate=True, max_length=1024)
+        # Tokenize with correct parameters
+        inputs = tokenizer.encode(prompt, return_tensors="pt", max_length=1024, truncation=True)
         if DEVICE == "cuda":
             inputs = inputs.to(DEVICE)
         
